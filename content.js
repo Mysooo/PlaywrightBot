@@ -157,4 +157,3 @@ function showOverlay(lines) {
   }, 10000);
 }
 
-
