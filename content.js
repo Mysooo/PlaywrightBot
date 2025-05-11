@@ -8,31 +8,65 @@ document.addEventListener('click', async function (e) {
   e.stopPropagation();
 
   const el = e.target;
-  const locators = [];
+  let locator = null;
 
   const testId = el.getAttribute('data-testid');
-  if (testId) locators.push(`getByTestId('${testId}')`);
+  if (testId) {
+    locator = `getByTestId('${testId}')`;
+  }
 
-  const text = el.textContent.trim();
-  if (text) locators.push(`getByText('${text}')`);
+  if (!locator) {
+    const role = el.getAttribute('role') || getComputedRole(el);
+    const name = el.getAttribute('aria-label') || el.getAttribute('alt') || el.textContent.trim();
+    if (role && name) {
+      locator = `getByRole('${role}', { name: '${name}' })`;
+    }
+  }
 
-  const role = el.getAttribute('role') || getComputedRole(el);
-  const name = el.getAttribute('aria-label') || el.getAttribute('alt') || text;
-  if (role && name) locators.push(`getByRole('${role}', { name: '${name}' })`);
+  if (!locator) {
+    const text = el.textContent.trim();
+    if (text) {
+      locator = `getByText('${text}')`;
+    }
+  }
 
-  const label = el.getAttribute('aria-label') || getLabelText(el);
-  if (label) locators.push(`getByLabel('${label}')`);
+  if (!locator) {
+    const label = el.getAttribute('aria-label') || getLabelText(el);
+    if (label) {
+      locator = `getByLabel('${label}')`;
+    }
+  }
 
-  const placeholder = el.getAttribute('placeholder');
-  if (placeholder) locators.push(`getByPlaceholder('${placeholder}')`);
+  if (!locator) {
+    const placeholder = el.getAttribute('placeholder');
+    if (placeholder) {
+      locator = `getByPlaceholder('${placeholder}')`;
+    }
+  }
 
-  locators.push(`locator('${getCssSelector(el)}')`);
-  locators.push(`locator('${getXPath(el)}')`);
+  if (!locator) {
+    locator = `locator('${getCssSelector(el)}')`;
+  }
 
-  showOverlay(locators);
+  // Show overlay
+  showOverlay([locator]);
+
+  //Record the action if recording is ON
+  const { recording } = await chrome.storage.sync.get(['recording']);
+  if (recording && locator) {
+    const action = {
+      locator: locator,
+      action: 'click',
+      timestamp: Date.now()
+    };
+
+    const { recordedActions = [] } = await chrome.storage.sync.get(['recordedActions']);
+    recordedActions.push(action);
+    await chrome.storage.sync.set({ recordedActions });
+  }
 }, true);
 
-
+// Utility functions 
 function getCssSelector(el) {
   if (el.id) return `#${el.id}`;
   let path = [];
@@ -103,57 +137,42 @@ function showOverlay(lines) {
     overlay.style.maxWidth = '400px';
     overlay.style.fontFamily = 'monospace';
     overlay.style.fontSize = '13px';
-    overlay.style.overflowY = 'auto';
-    overlay.style.maxHeight = '60vh';
     overlay.style.display = 'flex';
-    overlay.style.flexDirection = 'column';
+    overlay.style.alignItems = 'center';
     overlay.style.gap = '8px';
     document.body.appendChild(overlay);
   }
 
   overlay.innerHTML = '';
 
-  lines.forEach(line => {
-    const lineWrapper = document.createElement('div');
-    lineWrapper.style.display = 'flex';
-    lineWrapper.style.alignItems = 'flex-start';
-    lineWrapper.style.justifyContent = 'space-between';
-    lineWrapper.style.gap = '8px';
+  const line = lines[0];
+  const textSpan = document.createElement('code');
+  textSpan.textContent = line;
+  textSpan.style.whiteSpace = 'pre-wrap';
+  textSpan.style.wordBreak = 'break-word';
+  textSpan.style.flex = '1';
 
-    const textSpan = document.createElement('code');
-    textSpan.textContent = line;
-    textSpan.style.whiteSpace = 'pre-wrap';
-    textSpan.style.wordBreak = 'break-word';
-    textSpan.style.flex = '1';
+  const copyBtn = document.createElement('button');
+  copyBtn.textContent = '📋';
+  copyBtn.style.cursor = 'pointer';
+  copyBtn.style.background = '#333';
+  copyBtn.style.color = '#fff';
+  copyBtn.style.border = 'none';
+  copyBtn.style.borderRadius = '4px';
+  copyBtn.style.padding = '4px 8px';
+  copyBtn.style.fontSize = '12px';
 
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = '📋';
-    copyBtn.style.cursor = 'pointer';
-    copyBtn.style.background = '#333';
-    copyBtn.style.color = '#fff';
-    copyBtn.style.border = 'none';
-    copyBtn.style.borderRadius = '4px';
-    copyBtn.style.padding = '4px 8px';
-    copyBtn.style.fontSize = '12px';
-    copyBtn.style.flexShrink = '0';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(line);
+    copyBtn.textContent = '✅';
+    setTimeout(() => (copyBtn.textContent = '📋'), 1000);
+  };
 
-    copyBtn.onclick = () => {
-      navigator.clipboard.writeText(line);
-      copyBtn.textContent = '✅';
-      setTimeout(() => (copyBtn.textContent = '📋'), 1000);
-    };
-
-    lineWrapper.appendChild(textSpan);
-    lineWrapper.appendChild(copyBtn);
-    overlay.appendChild(lineWrapper);
-  });
-
-  overlay.style.display = 'block';
+  overlay.appendChild(textSpan);
+  overlay.appendChild(copyBtn);
+  overlay.style.display = 'flex';
 
   setTimeout(() => {
-    if (overlay.style.display !== 'none') {
-      overlay.style.display = 'none';
-    }
+    overlay.style.display = 'none';
   }, 10000);
 }
-

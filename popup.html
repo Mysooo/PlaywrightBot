@@ -3,15 +3,21 @@
 <head>
   <style>
     body { font-family: sans-serif; padding: 10px; }
-    button { margin-top: 10px; }
+    button { margin-top: 10px; display: block; }
   </style>
 </head>
 <body>
   <h3>Playwright Locator Helper</h3>
+
   <label>
     <input type="checkbox" id="toggleRecording">
     Enable Locator Suggestions
   </label>
+
+  <button id="startRecording">Start Recording</button>
+  <button id="stopRecording">Stop Recording</button>
+  <button id="downloadRecording">Download Recording</button>
+
   <script src="popup.js"></script>
 </body>
 </html>
